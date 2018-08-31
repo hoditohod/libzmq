@@ -220,7 +220,10 @@ void zmq::session_base_t::flush ()
 void zmq::session_base_t::rollback ()
 {
     if (_pipe)
+    {
         _pipe->rollback ();
+        _pipe->set_hwms(-1, -1);
+    }
 }
 
 void zmq::session_base_t::clean_pipes ()

@@ -268,7 +268,7 @@ void test_error_during_multipart ()
      * If the disconnect occurs in the middle of the multipart
      * message, the socket should not add the notification at the
      * end of the incomplete message. It must discard the incomplete
-     * message, and delivert the notification as a new message.
+     * message, and deliver the notification as a new message.
      */
 
     char long_str[128] = {0};
@@ -311,18 +311,77 @@ void test_error_during_multipart ()
     test_context_socket_close (router);
 }
 
+void test_disconnect_when_in_hwm_reached ()
+{
+    // setup router
+    void *router = test_context_socket (ZMQ_ROUTER);
+
+    int opt_notify = ZMQ_NOTIFY_DISCONNECT;
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_setsockopt (
+      router, ZMQ_ROUTER_NOTIFY, &opt_notify, sizeof (opt_notify)));
+
+    int opt_recvhwm = 2;
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_setsockopt (
+      router, ZMQ_RCVHWM, &opt_recvhwm, sizeof (opt_recvhwm)));
+
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_bind (router, ENDPOINT_0));
+
+
+    // setup dealer
+    void *dealer = test_context_socket (ZMQ_DEALER);
+    const char *dealer_routing_id = "X";
+
+    TEST_ASSERT_SUCCESS_ERRNO (
+      zmq_setsockopt (dealer, ZMQ_ROUTING_ID, dealer_routing_id, 1));
+
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (dealer, ENDPOINT_0));
+
+    send_string_expect_success (dealer, "1", 0);
+    send_string_expect_success (dealer, "2", 0);
+    send_string_expect_success (dealer, "3", 0);
+    send_string_expect_success (dealer, "4", 0);
+
+    msleep (SETTLE_TIME);
+
+    test_context_socket_close (dealer);
+
+    msleep (SETTLE_TIME);
+
+    recv_string_expect_success (router, dealer_routing_id, 0);
+    recv_string_expect_success (router, "1", 0);
+
+    recv_string_expect_success (router, dealer_routing_id, 0);
+    recv_string_expect_success (router, "2", 0);
+
+    recv_string_expect_success (router, dealer_routing_id, 0);
+    recv_string_expect_success (router, "3", 0);
+
+    recv_string_expect_success (router, dealer_routing_id, 0);
+    recv_string_expect_success (router, "4", 0);
+
+    recv_string_expect_success (router, dealer_routing_id, 0);
+    recv_string_expect_success (router, "", 0); // disconnect notif
+
+
+
+
+
+    test_context_socket_close (router);
+}
+
 
 int main (void)
 {
     setup_test_environment ();
 
     UNITY_BEGIN ();
-    RUN_TEST (test_sockopt_router_notify);
-    RUN_TEST (test_router_notify_connect);
-    RUN_TEST (test_router_notify_disconnect);
-    RUN_TEST (test_router_notify_both);
-    RUN_TEST (test_handshake_fail);
-    RUN_TEST (test_error_during_multipart);
+//    RUN_TEST (test_sockopt_router_notify);
+//    RUN_TEST (test_router_notify_connect);
+//    RUN_TEST (test_router_notify_disconnect);
+//    RUN_TEST (test_router_notify_both);
+//    RUN_TEST (test_handshake_fail);
+//    RUN_TEST (test_error_during_multipart);
 
+    RUN_TEST (test_disconnect_when_in_hwm_reached);
     return UNITY_END ();
 }

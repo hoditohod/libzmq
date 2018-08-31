@@ -1066,7 +1066,11 @@ void zmq::stream_engine_t::error (error_reason_t reason_)
 
         msg_t disconnect_notification;
         disconnect_notification.init ();
-        _session->push_msg (&disconnect_notification);
+        int rc = _session->push_msg (&disconnect_notification);
+        if (rc == -1)
+        {
+            printf("disconnect notification failed!\n"); fflush(stdout);
+        }
     }
 
 #ifdef ZMQ_BUILD_DRAFT_API
